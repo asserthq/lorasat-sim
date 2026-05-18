@@ -1,0 +1,18 @@
+[project]
+name = "adcs-sim"
+version = "0.1.0"
+description = "ADCS Simulation Environment"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "pysimscheduler @ git+https://gitflic.ru/project/asserthq/pysimsheduler-fork.git@master"
+]
+
+[tool.pyright]
+include = ["."]
+venvPath = "."
+venv = ".venv"
+executionEnvironments = [
+  { root = "." }
+]

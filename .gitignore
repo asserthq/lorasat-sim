@@ -1,0 +1,8 @@
+venv
+.venv
+__pycache__
+.cursor
+.vscode
+.zed
+.ipynb_checkpoints
+data
