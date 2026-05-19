@@ -1,163 +1,154 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Это симулятор учебного стенда из статьи.
-Он симулирует датчики (классы с именами датчиков) и динамику стенда
+Модель вращательного движения в трёхмерном пространстве кубсата, 3D
 
-UDP server for returning measured data from the spacecraft simulator testbed
+- Только магнитные катушки (ЭМУ)
+- астродинамика упрощённая
 
-accepts double [-1..+1] - fan control, eff. PWM
+Ядро модели составляют два уравнения:
+1. уравнение динамики, по которому рассчитывается угловая скорость $\omega^B$ и
+2. уравнение кинематики, по которому получается кватернион поворота связанной системы координат $\Lambda^{IB}$ относительно инерциального пространства I.
 
-returns:
-1. current control u
-2. vector of 9 double elements (MPU9250)
-wx, wy, wz [deg/s]
-ax, ay, az [g]
-mx, my, mz [mT]
-3. vector of 3 double elements (QMC5883)
-m2x, m2y, m2z [mT]
-
-All vectors in instrumental coordinate system, unfiltered, unbiased
+Физику поворотов проверил. Кватернионы ковариантные.
 """
-
-import time
-
 import libKernel
+import libADCS
+X_I, Y_I, Z_I = libADCS.X, libADCS.Y, libADCS.Z
+
 import numpy as np
+from pyquaternion import Quaternion
 from scipy.integrate import odeint
-
-
-class Sensor:
-    """моделируем датчик с _векторным_ выходом (3)"""
-
-    def __init__(self, mu, sigma, isEME=False):
-        """isEME если измеряемый вектор в инерциальной СК (датчик освещённости)
-        исключение - угловая скорость, она всегда в EME
-
-        Накладываем Гауссов шум
-
-        Args:
-            mu (array 3): смещения
-            sigma (array 3): стандартные отклонения"""
-        self.mu, self.sigma = mu, sigma
-        self.isEME = isEME
-        self.out = np.zeros(3)
-
-    def tick(self, v, theta=0.0):
-        """генерация выходной измеренной величины (+шум)
-
-        Args:
-            v - расчётное значение, np.array(3)
-            theta - угол поворота I относительно B, для паресчёта вектора в ССК [рад]
-        """
-        if self.isEME:
-            c, s = np.cos(-theta), np.sin(-theta)
-            R = np.array(((c, -s, 0), (s, c, 0), (0, 0, 1)))
-            self.out = np.matmul(R, v) + np.random.normal(self.mu, self.sigma, 3)
-        else:
-            self.out = v + np.random.normal(self.mu, self.sigma, 3)
-
-
-class MPU9250:
-    def __init__(self):
-        """модель датчика MPU92/50
-        wx, wy, wz [deg/s]
-        ax, ay, az [g]
-        mx, my, mz [mT]
-        """
-        self.r2d = 180 / np.pi
-        self.Magnetometer = Sensor(
-            mu=np.array([2.8, -3.1, 2.0]) * 1e-6, sigma=3.0e-6, isEME=True
-        )
-        self.Accelerometer = Sensor(
-            mu=np.random.normal(0, 0.05, 3), sigma=0.01, isEME=True
-        )
-        self.Gyroscope = Sensor(
-            mu=np.random.normal(0, 2, 3) / self.r2d, sigma=1.1 / self.r2d
-        )
-        # вектора (физика)
-        self.B = np.array([0.0, 40e-6, 0.0])  # магнитное поле (I), [T]
-        self.G = np.array([0, 0, -1])
-        # выход датчиков
-        self.gyro = np.zeros(3)
-        self.accel = np.zeros(3)
-        self.mag = np.zeros(3)
-
-    def tick(self, theta, omega):
-        self.Magnetometer.tick(self.B, theta)
-        self.Accelerometer.tick(self.G, theta)
-        self.Gyroscope.tick(omega)
-        self.mag = self.Magnetometer.out * 1e3  # [mT]
-        self.accel = self.Accelerometer.out  # [g]
-        self.gyro = self.Gyroscope.out * self.r2d  # [deg/s]
-
-
-class QMC5883:
-    def __init__(self):
-        """модель датчика QMC5883
-        m2x, m2y, m2z [mT]"""
-        self.Magnetometer = Sensor(
-            mu=np.array([2.8, -1.1, 1.0]) * 1e-6, sigma=2.0e-6, isEME=True
-        )
-        self.B = np.array([0.0, 40e-6, 0.0])  # магнитное поле (I), [T]
-
-    def tick(self, theta):
-        self.Magnetometer.tick(self.B, theta)
-
-    def measure(self):
-        """чтение выхода датчика"""
-        return self.Magnetometer.out * 1e3  # [mT]
-
-
-# %%
-class Simulator(libKernel.TaskTemplate):
-    """Интерфейс к датчикам и вентиляторам стенда"""
-
-    def Setup(self):
-        # ka, ku, J - идентифицированы! dt=140мс
-        ka = 3.32914427e-05
-        ku = 6.36414245e-02
-        Jres = 1 / 6.24375258e-02
-
-        # array([1.43155798e-07, 5.88172838e-01, 4.74464837e-02])
-        def myode(y, t, u):
-            """система ДУ, описывающая вертушку"""
-            theta, omega = y
-            Mu = ku * u
-            dydt = [omega, (Mu - ka * omega**2 * np.sign(omega)) * Jres]
-            return dydt
-
-        self.ODE = myode
-
-        self.imu = MPU9250()
-        self.compass = QMC5883()
-
-    def Initialize(self):
-        self.State = [0.0, 0.0]  # theta, omega in rad
-        self.tPrev = time.time()
-
-    def Run(self):
-        """вычисление состояния системы"""
-        fan = np.clip(self.U, -1.0, 1.0)
-        tNow = time.time()
-        sol = odeint(
-            self.ODE, self.State, [0, tNow - self.tPrev], args=(fan,), hmax=0.01
-        )  # , hmax=0.01
-
-        self.State = sol[-1, :]
-        self.tPrev = tNow
-
-        self.imu.tick(self.State[0], self.State[1])
-        self.compass.tick(self.State[0])
-
-        self.W_MPU = list(self.imu.gyro)
-        self.A_MPU = list(self.imu.accel)
-        self.B_MPU = list(self.imu.mag)
-        self.B_QMC = list(self.compass.measure())  # m2x, m2y, m2z [mT] (QMC5883)
-
-
+from importlib import reload
 import db
 
-# % Главный цикл
-model = Simulator(TaskList=db.Tasks, DB=db.DataBase())
+NORM_STEP = 15 # шаг нормировки кватерниона
+N_STEPS = 5 # колво шагов по времени, НОД(T1,Tcycle) в class EMUs
+
+class EMUs():
+    def __init__(self, T1=0.2, Tcycle=0.25):
+        """ модель ЭМУ. Катушки расположены пАрами, по строительным осям КА (по осям ССК / B)
+        ЭМУ работает часть (время Т1) цикла СОС (Tcycle)
+        """
+        # катушек - пара на ось
+        self.kEMU  = 2 * 0.2 # коэфф. катушек, u(-1..+1) -> L [А*м2]
+        self.T1    = T1
+        self.Tcycle= Tcycle
+        self.On = True
+        self.U = np.zeros(3) # Управление [-1..+1]
+        self.R = 40 # сопротивление одной катушки [Ом], их две в параллель
+        self.Ucc = 3.8*2 # напряжение питания катушки, два аккума последовательно
+        self.Icc = self.Ucc / self.R # ток катушки
+        self.Initialize()
+
+    def Initialize(self):
+        self.E = 0 # энергия, затраченная на управление
+
+    def M_B(self, B_B):
+        """ суммарный момент ЭМУ
+        Args:
+            B_B (np.array(3)): МПЗ [T]
+            t (float): время
+        """
+        self.L_B = self.kEMU * self.U
+        return np.cross(self.L_B, B_B)
+
+    def Pwr(self):
+        """ энергопотребление катушек [W] """
+        return 2 * np.sum( (self.Icc * self.U)**2 * self.R)
+
+    def isWorks(self, t):
+        """ множитель момента ЭМУ, по сути ШИМ-сигнал.
+        ЭМУ работает часть (время Т1) цикла СОС (Tcycle)
+        Returns:
+            isCoilWorks (float): 1 - до Т1, 0 после.
+        """
+        return (t % self.Tcycle <= self.T1) and self.On
+
+
+#%% Физика
+# Класс с описанием физики движения
+class Physics(libKernel.TaskTemplate):
+    # --- Параметры модели ---
+    J = np.diag([0.0122]*3) # момент инерции кубсата
+    # J *= 1 +  0.05 * J * np.random.standard_normal(3) # добавляем 5% неопределённости
+    invJ = np.linalg.inv(J)
+
+    def ODE_Rotational(self, x, t):
+        """ ДУ в форме Коши.
+        Момент создают дипольные катушки, расположены пАрами, по строительным осям КА
+
+        Args:
+            x: угловая скорость (рад/с), кватернион Q_IB, затраченная катушками энергия (Дж)"""
+        W, Q = x[:3], x[3:7]
+        M_B = self.Coils.isWorks(t) * self.Mm_B
+        dW = np.matmul(self.invJ, M_B - np.cross(W, np.matmul(self.J, W)))
+        dQ0 = -0.5*(Q[1]*W[0]+Q[2]*W[1]+Q[3]*W[2])
+        dQ1 =  0.5*(Q[0]*W[0]-Q[3]*W[1]+Q[2]*W[2])
+        dQ2 =  0.5*(Q[0]*W[1]-Q[1]*W[2]+Q[3]*W[0])
+        dQ3 =  0.5*(Q[0]*W[2]-Q[2]*W[0]+Q[1]*W[1])
+        dQ = np.array([dQ0, dQ1, dQ2, dQ3])
+        dE = self.Coils.Pwr()
+        return np.hstack((dW, dQ, dE))
+
+    def Astro(self):
+        """ Упрощённая модель астродинамики (I тождественна O)
+        Returns:
+            X_B, Z_B - вектора ИСК, взятые в ССК
+            B_B - МПЗ в ССК"""
+        X_B = self.Q_BI.rotate(X_I)
+        Z_B = self.Q_BI.rotate(Z_I)
+        B_B = self.Q_BI.rotate(self.B_I)
+        return X_B, Z_B, B_B
+
+    def Setup(self):
+        self.Coils = EMUs() #
+        self.ODE = lambda x,t: self.ODE_Rotational(x,t)
+        self.tSol = np.linspace(0, self.dt, N_STEPS)
+        # --- переменные модели
+        self.B_I = 40e-6 * X_I # МПЗ, [T]
+        self.nB_I = libADCS.normalizeL2(self.B_I) # используем то что B_I неподвижен, так то нужно каждую итерацию
+        self.Q_IB = Quaternion()  # кватернион связанной СК отн. инерциальной
+        self.Omega_I = np.zeros(3) # угловая скорость КА
+        self.Omega_B = np.zeros(3)
+
+
+    def Initialize(self, Omega_I=np.zeros(3), Q_IB=Quaternion()):
+        self.NS = NORM_STEP
+        self.Omega_I = Omega_I
+        self.Q_IB = Q_IB
+        self.Uemu = np.zeros(3)  # управление катушками выключаем
+        self.Q_BI = self.Q_IB.conjugate
+        self.B_B = self.Q_BI.rotate(self.B_I)
+        self.Omega_B = self.Q_BI.rotate(self.Omega_I)
+        self.Coils.Initialize()
+
+    def Run(self):
+        self.Coils.U = self.Uemu # получаем управление с предыдущего цикла
+        self.Mm_B = self.Coils.M_B(self.B_B)
+
+        x0 = [self.Omega_B[0], self.Omega_B[1], self.Omega_B[2],
+              self.Q_IB[0], self.Q_IB[1], self.Q_IB[2], self.Q_IB[3],
+              self.Coils.E]
+        sol = odeint(self.ODE, x0, self.tSol) # решаем ДУ физики
+        self.Omega_B = sol[-1,:3]
+        self.Q_IB[0] = sol[-1, 3]
+        self.Q_IB[1] = sol[-1, 4]
+        self.Q_IB[2] = sol[-1, 5]
+        self.Q_IB[3] = sol[-1, 6]
+        self.Coils.E = sol[-1, 7]
+        self.NS -= 1 # поднормируем кватернион на нужном шаге
+        if self.NS<=0:
+            self.NS = NORM_STEP
+            self.Q_IB = libADCS.qNormalizeL(self.Q_IB)
+        # повороты проверены - кватернионы соотв угловым скоростям
+        self.Q_BI = self.Q_IB.conjugate
+        self.Omega_I = self.Q_IB.rotate(self.Omega_B)
+        self.X_B, self.Z_B, self.B_B = self.Astro()
+        self.npQ_IB = self.Q_IB.elements
+
+
+#% Главный цикл
+reload(db)
+model = Physics(TaskList=db.Tasks, DB=db.DataBase())
 model.Manager.Loop()

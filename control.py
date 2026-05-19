@@ -6,6 +6,8 @@ from importlib import reload
 import libKernel
 import numpy as np
 from libGraph2D import Plot2D, Storager
+import libADCS
+X_I, Y_I, Z_I = libADCS.X, libADCS.Y, libADCS.Z
 
 import db
 from backend import GraphicsBackend
@@ -17,7 +19,30 @@ class ADCS(libKernel.TaskTemplate):
 
     # ********************* Алгоритмы *********************
     def Idle(self):
-        self.U = 0.0
+        self.U = np.zeros(3)
+
+    kBDot = 25.
+    def BDot(self):
+        """ алгоритм B-Dot (всё в ССК), классика """
+        # отнормируем вектор МПЗ (коэфф в контуре не будет зависеть от вариаций поля)
+        Bn = libADCS.normalizeL2(self.sensMag.out)
+        # считаем приращения dB, dt
+        self.dt = self.t - self.tp
+        self.dB = Bn - self.Bp
+
+        u = -self.kBDot * self.dB/self.dt # B-dot
+        self.Uemu = np.clip(u, -1., 1.) # напряжение на катушках, ШИМ линеен, предел \pm 1
+        self.tp, self.Bp = self.t, Bn # сохранение переменных на след итерацию
+
+    kBCross = -250.
+    def BCross(self):
+        """ алгоритм B-Cross (всё в ССК), классика """
+        Bn = libADCS.normalizeL2(self.sensMag.out)
+        T = self.kBCross * np.cross(Bn, self.Bp) # вектора уже нормированы
+        u = np.cross(Bn, T) # B-Cross
+        self.Uemu = np.clip(u, -1., 1.)
+        self.tp, self.Bp = self.t, Bn # сохранение переменных на след итерацию
+
 
     # ********************* Методы модели *********************
     def Setup(self):
@@ -26,8 +51,8 @@ class ADCS(libKernel.TaskTemplate):
         self.storager = Storager(DB=self)
         self.graphics = GraphicsBackend()
 
-        self.plot1.Setup("t", [["B_QMC", "B_MPU"], ["W_MPU"], ["U"]], name="EMF + w")
-        self.storager.Setup("t", ["B_QMC", "B_MPU", "W_MPU", "A_MPU"])
+        self.plot1.Setup("t", [["Omega_I"], ["Uemu"]], name="EMF + w")
+        self.storager.Setup("t", ["B_B", "Omega_I"])
         self.graphics.Setup()
 
     def Initialize(self):
@@ -37,8 +62,9 @@ class ADCS(libKernel.TaskTemplate):
 
         # Обновляем график с той же частотой, что и шаг симуляции (dt).
         self.plot1.dtPlot = self.dt
-
         self.Uemf = np.zeros(3)  # задаём начальное состояние (нулевые НУ)
+
+        self.tp, self.Bp = 0., np.zeros(3)
 
     def Run(self):
         self.storager.Run()
@@ -47,10 +73,10 @@ class ADCS(libKernel.TaskTemplate):
         self.graphics.Run()
 
         # проверка
-        if self.t < 5.0:
-            self.U = -1.0
+        if self.t < 105.0:
+            self.Uemu = libADCS.normalizeL2(np.array([1,1,1]))
         else:
-            self.U = 0.0
+            self.Uemu = np.zeros(3)
 
     def Finalize(self):
         path = "C:/Users/sanya/dev/lesson1/data/"
@@ -63,5 +89,5 @@ class ADCS(libKernel.TaskTemplate):
 
 # % Главный цикл
 reload(db)
-model = ADCS(TaskList=db.Tasks, DB=db.DataBase(), isSheduler=True, isRealTime=True)
+model = ADCS(TaskList=db.Tasks, DB=db.DataBase(), isSheduler=True, isRealTime=False)
 model.Manager.Loop()
