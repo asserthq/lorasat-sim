@@ -1,41 +1,49 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-                      """ База данных и задач диспетчера """
+# -*- coding: utf-8 -*-
+from pyquaternion import Quaternion
 import numpy as np
 
+#%% Главная БД, + начальные значения
+# ! внимательно задать типы !
 
-class DataBase:
+# Зарезервированы имена: Manager (менеджер БД), name (имя задачи)
+# нельзя чтобы имена переменных совпали с методами задач (в текущей версии менеждер перезапишет имена)
+# Имена начинаются с большой буквы. Могут иметь префикс:
+# префикс m-model с бортовой модели, s-sensor с датчика, o-observed наблюдаемая
+# без префикса - "истинная"
+
+class DataBase():
     # --- общие переменные ---
-    t = 0.0  # время
-    dt = 1.0 / 60  # шаг задач
-    tmax = 120.0  # время моделирования
-    cmd = 0  # команда всем задачам
+    t = 0.   # время
+    dt = 0.25 # шаг задач
+    tmax = 500.  # время моделирования np.pi/6 / 0.1
+    cmd = 0 # команда всем задачам
 
-    w = -0.25  # угловая скорость, рад/с
-    phi = 0.0  # угол, рад
-    Q_IB = np.array([1, 0, 0, 0])
-    # псевдотрехмерные - только для отработки алгоритмов
-    B = 41e-6 * np.array([np.cos(phi), np.sin(phi), 0])  # МПЗ, T
-    U = 0.0  # управление
+    # --- пользовательские переменные ---
+    # начальные значения задаются в задаче simulator.py
+    Omega_B = np.zeros(3)
+    Omega_I = np.zeros(3)
 
-    # датчики
-    B_QMC = np.zeros(3)
-    B_MPU = np.zeros(3)
-    W_MPU = np.zeros(3)
-    A_MPU = np.zeros(3)
+    Q_IB = Quaternion()  # кватернион связанной СК относительно инерциальной
+    Uemu = np.zeros(3)      # управление катушками
+    B_B = 40e-6 * np.array([1, 0, 0]) # МПЗ, [T]
+    B_I = B_B
 
 
-# Список задач
 # задачи вызываются в порядке следования в словаре
-# выполняются параллельно - в смысле модельного времени
 Tasks = {
-    "ADCS": {"Keys": "t,cmd"},
-    # 'Emulator': {'Keys':"""t,cmd,
-    #                        B_QMC,B_MPU,W_MPU,A_MPU,
-    #                        U""",
-    #               'Addr':('192.168.43.77', 6502)},
-    "Simulator": {
-        "Keys": """t,cmd,
-                           B_QMC,B_MPU,W_MPU,A_MPU,
-                           U"""
-    },
-}
+    'ADCS': {'Keys':"""t,cmd,dt"""},
+    'Physics': {'Keys':"""t,cmd,dt,
+                          Uemu,
+                          Omega_B,Q_IB,Omega_I,
+                          B_B"""},
+    'plot3D': {'Keys':"""t,cmd,dt,
+                          Q_IB,B_I""",
+                    'noAnswer':True},
+    # 'Plotter2D': {'Keys':"""t,cmd,dt,
+    #                       Uemu,
+    #                       Omega_B,Omega_I,
+    #                       B_B,B_I,
+    #                       Q_IB,sQ_IB,OrbX_B,Ma_B""",
+    #                 'noAnswer':True},
+    }

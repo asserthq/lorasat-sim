@@ -10,3 +10,5 @@
 # Структура
 Основа - фреймворк [https://gitflic.ru/project/alexlelekov/pysimsheduler.git](PySimSheduler) для симуляции систем управления. В зависимостях указан форк [https://gitflic.ru/project/asserthq/pysimsheduler-fork](pysimsheduler-fork).
 TODO: подправить основной репозиторий `PySimSheduler`, файл `setup.cfg` скорее всего. За пример можно взять форк.
+
+TODO: внести в PySimSheduler/libGraph2D код из backend.py
