@@ -31,7 +31,8 @@ class Plotter2D(libKernel.TaskTemplate):
         self.plot1.Setup("t", [["Omega_B"], ["Omega_I"], ["wn_B"]], name="Omega")
         self.plot2 = Plot2D(DB=self)
         # self.plot2.Setup('t', [['B_B'], ['B_I'], ['dBB', 'dBI']], name='EMF')
-        self.plot2.Setup("t", [["Q_IB"], ["sQ_IB"], ["Ma_B"]], name="Quaternions")
+        # self.plot2.Setup("t", [["Q_IB"], ["sQ_IB"], ["Ma_B"]], name="Quaternions")
+        self.plot2.Setup("t", [["Q_IB"]], name="Quaternions")
         # self.Buf = DataBuffer(Obj=self)
         # self.Buf.Setup('t', ['B_B', 'B_I'], N=2) # 5c
 

@@ -6,7 +6,7 @@ from importlib import reload
 import libKernel
 import matplotlib.pyplot as plt
 import numpy as np
-from libGraph2D import Plot2D, Storager
+from libGraph2D import Storager
 
 import db
 import libADCS
@@ -50,29 +50,29 @@ class ADCS(libKernel.TaskTemplate):
 
     # ********************* Методы модели *********************
     def Setup(self):
-        plt.ion()
+        # plt.ion()
         # подготовка графиков, логов, буфера
-        self.plot1 = Plot2D(DB=self)
+        # self.plot1 = Plot2D(DB=self)
         self.storager = Storager(DB=self)
 
-        self.plot1.Setup("t", [["Omega_I"], ["Uemu"]], name="EMF + w")
+        # self.plot1.Setup("t", [["Omega_I"], ["Uemu"]], name="EMF + w")
         self.storager.Setup("t", ["B_B", "Omega_I"])
 
     def Initialize(self):
-        plt.show(block=False)
+        # plt.show(block=False)
         self.storager.Initialize()
-        self.plot1.Initialize()
+        # self.plot1.Initialize()
 
         # Обновляем график с той же частотой, что и шаг симуляции (dt).
-        self.plot1.dtPlot = self.dt
-        self.Uemf = np.zeros(3)  # задаём начальное состояние (нулевые НУ)
+        # self.plot1.dtPlot = self.dt
+        self.Uemu = np.zeros(3)  # задаём начальное состояние (нулевые НУ)
 
         self.tp, self.Bp = 0.0, np.zeros(3)
 
     def Run(self):
         self.storager.Run()
         # сохраняем графики, буфер, логи
-        self.plot1.Run()
+        # self.plot1.Run()
 
         # проверка
         if self.t < 105.0:
@@ -85,9 +85,7 @@ class ADCS(libKernel.TaskTemplate):
         now = datetime.now()
         name = f"{now.strftime('%Y-%m-%d_%H-%M-%S')}_ADCS_{self.tmax:.0f}.csv"
         self.storager.Finalize(path + name)
-        self.plot1.Finalize()
-        plt.ioff()
-        plt.show()
+        # self.plot1.Finalize()
 
 
 # % Главный цикл
