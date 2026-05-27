@@ -6,11 +6,11 @@
 
 from importlib import reload
 
-import libKernel
 import matplotlib.pyplot as plt
 import numpy as np
-from libGraph2D import Plot2D
-from libUtils import DataBuffer
+from pysimscheduler import libKernel
+from pysimscheduler.libGraph2D import Plot2D
+from pysimscheduler.libUtils import DataBuffer
 
 import db
 

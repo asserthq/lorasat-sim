@@ -3,18 +3,26 @@
 from datetime import datetime
 from importlib import reload
 
-import libKernel
 import matplotlib.pyplot as plt
 import numpy as np
-from libGraph2D import Storager
+from pysimscheduler import libKernel
+from pysimscheduler.libGraph2D import Storager
 
 import db
-import libADCS
+from lib import libADCS
 
 X_I, Y_I, Z_I = libADCS.X, libADCS.Y, libADCS.Z
 
 
-# %%
+from pathlib import Path
+
+# Путь к папке, где лежит текущий файл
+current_dir = Path(__file__).resolve().parent
+print(f"Скрипт находится в: {current_dir}")
+
+OUTPUT_DIR = current_dir / "../../output"
+
+
 class ADCS(libKernel.TaskTemplate):
     """система ориентации"""
 
@@ -81,7 +89,7 @@ class ADCS(libKernel.TaskTemplate):
             self.Uemu = np.zeros(3)
 
     def Finalize(self):
-        path = "/home/lynx/dev/1440/adcs-sim/data/"
+        path = str(OUTPUT_DIR) + "/"
         now = datetime.now()
         name = f"{now.strftime('%Y-%m-%d_%H-%M-%S')}_ADCS_{self.tmax:.0f}.csv"
         self.storager.Finalize(path + name)

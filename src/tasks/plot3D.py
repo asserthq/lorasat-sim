@@ -6,9 +6,9 @@
 
 import time
 
-import libKernel
 import matplotlib.pyplot as plt
-from libGraph3D import Figure3D, PlotterCS, PlotterSat, PlotterVector
+from pysimscheduler import libKernel
+from pysimscheduler.libGraph3D import Figure3D, PlotterCS, PlotterSat, PlotterVector
 
 import db
 

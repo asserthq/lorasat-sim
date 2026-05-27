@@ -46,64 +46,76 @@ from pyquaternion import Quaternion
 # при тестах и т.п. импортируем графику
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    import libGraphQ
+    from pysimscheduler import libGraphQ
 
-X = np.array([1.,0, 0])
-Y = np.array([0, 1.,0])
-Z = np.array([0, 0, 1.])
+X = np.array([1.0, 0, 0])
+Y = np.array([0, 1.0, 0])
+Z = np.array([0, 0, 1.0])
 O = np.zeros(3)
-Q_1 = Quaternion() # единичный кватернион
+Q_1 = Quaternion()  # единичный кватернион
+
 
 # %% Кватернионы
 def qConj(q):
-    """ сопряженный кватернион """
+    """сопряженный кватернион"""
     return np.array([q[0], -q[1], -q[2], -q[3]])
 
+
 def qV2Q(v):
-    """ кватернионое представление вектора """
+    """кватернионое представление вектора"""
     return np.array([0, v[0], v[1], v[2]])
 
+
 def qVect(q):
-    """ верзор кватерниона """
+    """верзор кватерниона"""
     return q[1:]
 
+
 def qMul(q, p):
-    """ кватернионное умножение """
-    return np.array([q[0]*p[0]-q[1]*p[1]-q[2]*p[2]-q[3]*p[3],
-	 			     q[0]*p[1]+q[1]*p[0]+q[2]*p[3]-q[3]*p[2],
-	 			     q[0]*p[2]-q[1]*p[3]+q[2]*p[0]+q[3]*p[1],
-				     q[1]*p[3]+q[1]*p[2]-q[2]*p[1]+q[3]*p[0]])
+    """кватернионное умножение"""
+    return np.array(
+        [
+            q[0] * p[0] - q[1] * p[1] - q[2] * p[2] - q[3] * p[3],
+            q[0] * p[1] + q[1] * p[0] + q[2] * p[3] - q[3] * p[2],
+            q[0] * p[2] - q[1] * p[3] + q[2] * p[0] + q[3] * p[1],
+            q[1] * p[3] + q[1] * p[2] - q[2] * p[1] + q[3] * p[0],
+        ]
+    )
+
 
 def qRotateQ(m, q):
-    """ Поворачиваем кватернион m на кватернион q
-    ! Кватернионы нормированы ! """
+    """Поворачиваем кватернион m на кватернион q
+    ! Кватернионы нормированы !"""
     return qMul(q, qMul(m, qConj(q)))
 
+
 def qRotateV(v, q):
-    """ Поворачиваем вектор v на кватернион q """
-    if np.linalg.norm(v)>1e-12:
+    """Поворачиваем вектор v на кватернион q"""
+    if np.linalg.norm(v) > 1e-12:
         qVR = qRotateQ(qV2Q(v), q)
-        return qVR[1:] # возврат векторной части
+        return qVR[1:]  # возврат векторной части
     else:
         return v
 
 
 def qSuperposeVectors(a, b):
-    """ кватернион поворота, совмещающий вектора a -> b
-    quatP2P https://nabbla1.livejournal.com/187019.html """
+    """кватернион поворота, совмещающий вектора a -> b
+    quatP2P https://nabbla1.livejournal.com/187019.html"""
     # ax, an = rotAxisAngle(a, b)
     # return Quaternion(axis=ax, angle=an)
-    q = Quaternion(scalar=1+np.dot(a,b), vector=np.cross(a,b))
+    q = Quaternion(scalar=1 + np.dot(a, b), vector=np.cross(a, b))
     return q.unit
 
+
 def vec2quat(V):
-    if np.linalg.norm(V)>0:
+    if np.linalg.norm(V) > 0:
         return Quaternion(axis=V, angle=np.linalg.norm(V))
     else:
         return Quaternion()
 
+
 def qIntegrateW_1(q, w, dt):
-    """ поворачиваем кватернион, угловая скорость и шаг по времени
+    """поворачиваем кватернион, угловая скорость и шаг по времени
     интегрирование на один шаг, метод 1-го порядка
     https://nabbla1.livejournal.com/190195.html
     проверено.
@@ -113,73 +125,84 @@ def qIntegrateW_1(q, w, dt):
         w (numpy.array): угловая скорость
         dt (float): шаг по времени
     """
-    mu = [1, w[0]*dt/2, w[1]*dt/2, w[2]*dt/2]
-    l0 = q[0] - q[1]*mu[1] - q[2]*mu[2] - q[3]*mu[3]
-    l1 = q[1] + q[0]*mu[1] + q[2]*mu[3] - q[3]*mu[2]
-    l2 = q[2] + q[0]*mu[2] + q[3]*mu[1] - q[1]*mu[3]
-    l3 = q[3] + q[0]*mu[3] + q[1]*mu[2] - q[2]*mu[1]
-    kn = 1.5 - 0.5*(l0*l0+l1*l1+l2*l2+l3*l3) # нормировочный коэфф. (можно не каждый шаг)
-    q[0], q[1], q[2], q[3] = l0*kn, l1*kn, l2*kn, l3*kn # + нормализация кватерниона, аппроксимация 1 членом ряда
+    mu = [1, w[0] * dt / 2, w[1] * dt / 2, w[2] * dt / 2]
+    l0 = q[0] - q[1] * mu[1] - q[2] * mu[2] - q[3] * mu[3]
+    l1 = q[1] + q[0] * mu[1] + q[2] * mu[3] - q[3] * mu[2]
+    l2 = q[2] + q[0] * mu[2] + q[3] * mu[1] - q[1] * mu[3]
+    l3 = q[3] + q[0] * mu[3] + q[1] * mu[2] - q[2] * mu[1]
+    kn = 1.5 - 0.5 * (
+        l0 * l0 + l1 * l1 + l2 * l2 + l3 * l3
+    )  # нормировочный коэфф. (можно не каждый шаг)
+    q[0], q[1], q[2], q[3] = (
+        l0 * kn,
+        l1 * kn,
+        l2 * kn,
+        l3 * kn,
+    )  # + нормализация кватерниона, аппроксимация 1 членом ряда
+
 
 def qNormalizeL(q):
-    """ нормализация кватерниона, аппроксимация 1 членом ряда """
-    return (1.5 -0.5*(q[0]*q[0] + q[1]*q[1] + q[2]*q[2] + q[3]*q[3])) * q
+    """нормализация кватерниона, аппроксимация 1 членом ряда"""
+    return (1.5 - 0.5 * (q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3])) * q
 
 
 def qDelta(q1, q2):
-    """ метрика разности кватернионов """
+    """метрика разности кватернионов"""
     # https://nabbla1.livejournal.com/196144.html?es=4
     d = q1 - q2
-    return 2*d.norm*np.sqrt(1 - d.norm**2/4)
+    return 2 * d.norm * np.sqrt(1 - d.norm**2 / 4)
+
 
 def qPrint(name, q):
-    """ Печатает кватернион .3f.
+    """Печатает кватернион .3f.
 
     Args:
         name (str): имя кватерниона
         q (Quaternion, array4): кватернион"""
-    print(f'{name} {q[0]:.3f}, {q[1]:.3f}, {q[2]:.3f}, {q[3]:.3f}')
+    print(f"{name} {q[0]:.3f}, {q[1]:.3f}, {q[2]:.3f}, {q[3]:.3f}")
+
 
 def qSqrt(C):
-    """ корень кватерниона C """
+    """корень кватерниона C"""
     C_dot = np.linalg.norm(C.vector)
-    C_e = C.vector/C_dot
+    C_e = C.vector / C_dot
     C_norm = np.linalg.norm(C.elements)
 
-    f_0 = np.sqrt((C_norm + C.scalar)/2)
-    f_dot = np.sqrt((C_norm - C.scalar)/2) * C_e
+    f_0 = np.sqrt((C_norm + C.scalar) / 2)
+    f_dot = np.sqrt((C_norm - C.scalar) / 2) * C_e
 
     sqrtC_pos = Quaternion(scalar=f_0, vector=f_dot)
     # sqrtC_neg = Quaternion(scalar=f_0, vector=-f_dot)
     return sqrtC_pos
 
-#%% Алгоритмы
+
+# %% Алгоритмы
 def algTriangle(N, EMF):
-    """ алгоритм расчета поворотов методом треугольника дуг
+    """алгоритм расчета поворотов методом треугольника дуг
     первый поворот xA, затем xB, т.е. N = xB*xA
     умножение кватернионов обычное, слева
     Args:
         N (Quaternion): заданный кватернион поворота
-        EMF (array[3]): вектор МПЗ """
-    if np.abs(np.dot(EMF, N.axis))>0.9999999:
+        EMF (array[3]): вектор МПЗ"""
+    if np.abs(np.dot(EMF, N.axis)) > 0.9999999:
         # исключаем особую точку, когда EMF = +/- N.axis
-        EMF += np.random.rand(3)*1e-5
+        EMF += np.random.rand(3) * 1e-5
     # Проекция EMF на плоскость, перп
     E = crossLinePlane(EMF, N.axis, N.axis)
     # точка пересечения со сферой, ближайшая к B
     A = normalizeL2(E)
     # нормаль к плоскости NxEMF
-    n = normalizeL2( np.cross(N.axis, EMF) )
+    n = normalizeL2(np.cross(N.axis, EMF))
     # ищем точки начала и конца дуги
-    Aa = Quaternion(axis=N.axis, angle=-N.angle/4).rotate(A)
+    Aa = Quaternion(axis=N.axis, angle=-N.angle / 4).rotate(A)
 
     # выбор ближайшей точки (с прошлой версии кода, см ниже)
     k = np.sign(np.dot(EMF, A))
     # k = 1 if np.dot(EMF, A)>0 else -1
-    axis, angle = rotAxisAngle(Aa, k*EMF) # к ближайшей
-    xA = Quaternion(axis=axis, angle=angle*2)
+    axis, angle = rotAxisAngle(Aa, k * EMF)  # к ближайшей
+    xA = Quaternion(axis=axis, angle=angle * 2)
     axis = vSymmetricalOfPlane(axis, n)
-    xB = Quaternion(axis=axis, angle=angle*2)
+    xB = Quaternion(axis=axis, angle=angle * 2)
 
     # axis, angle = rotAxisAngle(Aa, -k*EMF) # к противоположной
     # xC = Quaternion(axis=axis, angle=angle*2)
@@ -194,8 +217,8 @@ def algTriangle(N, EMF):
     # композицию меньших поворотов
     return xA, xB
 
-#
 
+#
 
 
 # def quatArc(B, C, EMF):
@@ -281,51 +304,54 @@ def algTriangle(N, EMF):
 #         print(f'NaN qArcB: u={u}, v={v}, EMF={EMF}')
 #     return Quaternion(w=cosa2, x=a[0]*sina2, y=a[1]*sina2, z=a[2]*sina2)
 
+
 def vAngle(a, b):
-    """ угол между векторами, в радианах """
-    return np.arccos(np.dot(a,b)/np.sqrt(np.dot(a,a)*np.dot(b,b)))
+    """угол между векторами, в радианах"""
+    return np.arccos(np.dot(a, b) / np.sqrt(np.dot(a, a) * np.dot(b, b)))
+
 
 def algArcB(u, v, B, tol=0.01):
-    """ Кватернион кратчайшего поворота u->v, верзор которого перпендикулярен EMF
+    """Кватернион кратчайшего поворота u->v, верзор которого перпендикулярен EMF
     Args:
         u (np.array 3): вектор z_B
         v (np.array 3): вектор z_O (z_I)
         EMF (np.array 3): вектор МПЗ
     """
-    uv = np.linalg.norm(u-v)
+    uv = np.linalg.norm(u - v)
     if uv < tol:
         # не поворачиваемся, слишком близко
-        return Quaternion() # возможно, это стоит проверять снаружи
+        return Quaternion()  # возможно, это стоит проверять снаружи
     # проецируем точки u,v на плоскость, перпендикулярную EMF
-    U = u - B * np.dot(B,u)
-    V = v - B * np.dot(B,v)
+    U = u - B * np.dot(B, u)
+    V = v - B * np.dot(B, v)
     # Через них проходит прямая j с направл. вектором
     r0 = V
     a = U - V
     # находим середину отрезка v-vT
-    M = (u + v)/2
+    M = (u + v) / 2
     # через него проводим перпендикулярно ему плоскость q
     n = u - v
     D = np.dot(n, -M)
     # Пересечение прямой j и плоскости q - центр дуги, ось кватерниона
-    F = r0 - a * (np.dot(n,r0) + D)/np.dot(n,a)
+    F = r0 - a * (np.dot(n, r0) + D) / np.dot(n, a)
 
-    g = u-F
-    h = v-F
+    g = u - F
+    h = v - F
 
     an = vAngle(g, h)
     # ax = normalizeL2(F)
     lenF = np.linalg.norm(F)
-    ax = lenF * normalizeL2(F) + (1-lenF) * np.cross(g,h)
+    ax = lenF * normalizeL2(F) + (1 - lenF) * np.cross(g, h)
 
-    if np.dot(ax, np.cross(g,h))<0:
+    if np.dot(ax, np.cross(g, h)) < 0:
         ax = -ax
     # axis, angle = rotAxisAngle(g, h)
     return Quaternion(axis=ax, angle=an)
 
 
-#% Тесты
+# % Тесты
 if __name__ == "__main__":
+
     def plotTestCase(fig, ax, u, v, B):
         q = algArcB(u, v, B)
         # print('   целевой v:', v)
@@ -338,18 +364,18 @@ if __name__ == "__main__":
         Fig.equal()
 
         Line = libGraphQ.Line1OnSphere(ax, qList, v=u)
-        uV = libGraphQ.Vector(ax, vector=u, label='u', color='C1')
-        vV = libGraphQ.Vector(ax, vector=v, label='v', color='C2')
-        BV = libGraphQ.Vector(ax, vector=B, label='B', color='C3')
-        qV = libGraphQ.Vector(ax, vector=q.axis, label='q', color='C4')
+        uV = libGraphQ.Vector(ax, vector=u, label="u", color="C1")
+        vV = libGraphQ.Vector(ax, vector=v, label="v", color="C2")
+        BV = libGraphQ.Vector(ax, vector=B, label="B", color="C3")
+        qV = libGraphQ.Vector(ax, vector=q.axis, label="q", color="C4")
         dv = np.linalg.norm(v - q.rotate(u))
-        title = f'dv = {dv:.2g}'
+        title = f"dv = {dv:.2g}"
         ax.set_title(title, fontsize=10)
 
-
-    fig, axs = plt.subplots(ncols=2, nrows=2, figsize=(9.5, 9.5),
-                            subplot_kw={'projection': '3d'}) # layout="constrained")
-    fig.canvas.manager.set_window_title('Figure: algArcB')
+    fig, axs = plt.subplots(
+        ncols=2, nrows=2, figsize=(9.5, 9.5), subplot_kw={"projection": "3d"}
+    )  # layout="constrained")
+    fig.canvas.manager.set_window_title("Figure: algArcB")
     v = Z
     # рядом с большой дугой
     B = -Y
@@ -360,18 +386,18 @@ if __name__ == "__main__":
     plotTestCase(fig, axs[0][1], u, v, B)
     # классика
     B = X
-    u = Quaternion(axis=X-0.2*Y, degrees=40).rotate(v)
+    u = Quaternion(axis=X - 0.2 * Y, degrees=40).rotate(v)
     plotTestCase(fig, axs[1][0], u, v, B)
     # классика наоборот
     B = X
-    u = Quaternion(axis=X+0.2*Y, degrees=40).rotate(v)
+    u = Quaternion(axis=X + 0.2 * Y, degrees=40).rotate(v)
     plotTestCase(fig, axs[1][1], u, v, B)
 
 
 # # libGraphQ.Vector(ax, vector=g, label='g', color='C5')
 # # libGraphQ.Vector(ax, vector=h, label='h', color='C6')
 
-#%%
+# %%
 
 
 # z_B=B=np.array([0.741,-0.146,0.655])
@@ -399,8 +425,9 @@ if __name__ == "__main__":
 # q = qLongArc(z_B, z_I, EMF)
 # libADCS.vAngle(q.rotate(z_B), z_I) # = 0.0, OK
 
+
 def algApproxSuperpose(n, u, v):
-    """ Кватернион поворота по заданной оси, наиболее точно совмещающий два направления
+    """Кватернион поворота по заданной оси, наиболее точно совмещающий два направления
     Args:
         n: ось поворота (единичный вектор направления на первый объект),
         u: текущее направление второго объектива,
@@ -411,9 +438,12 @@ def algApproxSuperpose(n, u, v):
 
     https://nabbla1.livejournal.com/194753.html"""
 
-    phi = np.arctan2(np.dot(np.cross(n,u),v), np.dot(u,v) - np.dot(n,v)*np.dot(n,u))
+    phi = np.arctan2(
+        np.dot(np.cross(n, u), v), np.dot(u, v) - np.dot(n, v) * np.dot(n, u)
+    )
     return Quaternion(axis=n, angle=phi)
     # quatApproxCombine([0,0,1], [0,1,0], [1,0,0])
+
 
 # def quatShortest():
 #     """ Кватернион кратчайшего поворота системы координат (Мортари-Маркли)
@@ -423,159 +453,175 @@ def algApproxSuperpose(n, u, v):
 
 #     return Quaternion()
 
+
 def algMortariMarkley(R, B, weights=None):
-        """ Алгоритм Мортари-Маркли: OLAE (Optimal Linear Attitude Estimator)
-        находим кватернион, переводящий эталонные вектора R в измеренные B
-        https://nabbla1.livejournal.com/200050.html
+    """Алгоритм Мортари-Маркли: OLAE (Optimal Linear Attitude Estimator)
+    находим кватернион, переводящий эталонные вектора R в измеренные B
+    https://nabbla1.livejournal.com/200050.html
 
-        Args:
-            R, B: list из векторов np.array(3)
-                R в EME, B в Body
-        Returns:
-            qIB: Кватернион кратчайшего поворота системы координат
-        """
-        N = len(R)
-        if weights is None:
-            weights = np.ones(len(R))
+    Args:
+        R, B: list из векторов np.array(3)
+            R в EME, B в Body
+    Returns:
+        qIB: Кватернион кратчайшего поворота системы координат
+    """
+    N = len(R)
+    if weights is None:
+        weights = np.ones(len(R))
 
-        # 1. Из "эталонных" и "измеренных" векторов строим суммы и разности:
-        S, D = [], []
-        for i in range(N):
-            S.append(R[i] + B[i])
-            D.append(R[i] - B[i])
+    # 1. Из "эталонных" и "измеренных" векторов строим суммы и разности:
+    S, D = [], []
+    for i in range(N):
+        S.append(R[i] + B[i])
+        D.append(R[i] - B[i])
 
-        #% 2. По векторам сумм и разности вычисляем вектор v и матрицу M:
-        v = np.zeros(3)
-        M = np.zeros((3,3))
-        for i in range(N):
-            v += weights[i] * np.cross(S[i], D[i])
+    # % 2. По векторам сумм и разности вычисляем вектор v и матрицу M:
+    v = np.zeros(3)
+    M = np.zeros((3, 3))
+    for i in range(N):
+        v += weights[i] * np.cross(S[i], D[i])
 
-            SCI = np.array([[0, -S[i][2], S[i][1]],
-                                [S[i][2], 0, -S[i][0]],
-                                [-S[i][1], S[i][0], 0]])
-            M += weights[i] * np.matmul(SCI.T, SCI)
+        SCI = np.array(
+            [[0, -S[i][2], S[i][1]], [S[i][2], 0, -S[i][0]], [-S[i][1], S[i][0], 0]]
+        )
+        M += weights[i] * np.matmul(SCI.T, SCI)
 
-        #% 3. Решаем линейное матричное уравнение
-        # (что то же самое - систему из 3 уравнений с 3 неизвестными):
-        theta = np.linalg.solve(M, -v)
+    # % 3. Решаем линейное матричное уравнение
+    # (что то же самое - систему из 3 уравнений с 3 неизвестными):
+    theta = np.linalg.solve(M, -v)
 
-        #% 4. Из вектора Родрига получаем кватернион
-        Lnu = Quaternion(scalar=1, vector=theta).normalised
-        # ниже: поворот вектора на кватернион (который ищет Мортари-Маркли)
-        # соответствует повороту системы координат на обратный поворот (mortari.py)
-        # возвращает qIB
-        return Lnu.inverse
+    # % 4. Из вектора Родрига получаем кватернион
+    Lnu = Quaternion(scalar=1, vector=theta).normalised
+    # ниже: поворот вектора на кватернион (который ищет Мортари-Маркли)
+    # соответствует повороту системы координат на обратный поворот (mortari.py)
+    # возвращает qIB
+    return Lnu.inverse
 
-#%% Вектора
+
+# %% Вектора
 def vAngle(a, b):
-    """ угол между векторами, в радианах """
-    return np.arccos(np.dot(a,b)/np.sqrt(np.dot(a,a)*np.dot(b,b)))
+    """угол между векторами, в радианах"""
+    return np.arccos(np.dot(a, b) / np.sqrt(np.dot(a, a) * np.dot(b, b)))
+
 
 def vDelta(ax1, ax2):
-    """ метрика разности векторов """
-    return np.linalg.norm(ax1-ax2)
+    """метрика разности векторов"""
+    return np.linalg.norm(ax1 - ax2)
+
 
 def vSymmetricalOfPlane(v, n):
-    """ расчет вектора, симметричного относительно плоскости,
+    """расчет вектора, симметричного относительно плоскости,
     !! проходящей через O !!
 
     Args:
         v (array[3]): вектор
-        n (array[3]): нормальный вектор плоскости """
-    return v - 2*np.dot(v, n)*n
+        n (array[3]): нормальный вектор плоскости"""
+    return v - 2 * np.dot(v, n) * n
+
 
 def vCollinearPlusNormal(a, b):
-    """ разложить a вектор на сумму коллинеарного с и нормального n вектору b """
-    c = np.dot(a, b) * normalizeL2(b) # коллинеарная B
-    n = a - c # перпендикуляр
+    """разложить a вектор на сумму коллинеарного с и нормального n вектору b"""
+    c = np.dot(a, b) * normalizeL2(b)  # коллинеарная B
+    n = a - c  # перпендикуляр
     return c, n
 
-def vNormalVsCollinear(v, vBase):
-    """ метрика - отношение нормальной и коллинеарной составл. вектора v
-    относительно базового вектора vBase
-    возврат числа 0..1 """
-    c, n = vCollinearPlusNormal(v, vBase) # коллинеарная и нормальная составляющие
-    # соотношение этих составляющих, нормируем к 0..1
-    return np.arctan2(np.linalg.norm(n), np.linalg.norm(c))/(np.pi/2)
 
-def norm1(v, length=1.):
-    """ нормирует вектор v к длине length
+def vNormalVsCollinear(v, vBase):
+    """метрика - отношение нормальной и коллинеарной составл. вектора v
+    относительно базового вектора vBase
+    возврат числа 0..1"""
+    c, n = vCollinearPlusNormal(v, vBase)  # коллинеарная и нормальная составляющие
+    # соотношение этих составляющих, нормируем к 0..1
+    return np.arctan2(np.linalg.norm(n), np.linalg.norm(c)) / (np.pi / 2)
+
+
+def norm1(v, length=1.0):
+    """нормирует вектор v к длине length
     Args:
-        v: вектор (массив numpy) """
+        v: вектор (массив numpy)"""
     norm = np.linalg.norm(v)
-    if norm==0:
+    if norm == 0:
         return v
-    return v/norm * length
+    return v / norm * length
+
 
 def normalizeL0(v):
-    """ ничего не делает """
+    """ничего не делает"""
     return v
 
+
 def normalizeL1(v):
-    """ нормирует вектор v по прямоугольной норме L1
+    """нормирует вектор v по прямоугольной норме L1
     сумма компонентов v будет равна 1
     Args:
-        v: вектор (массив numpy) """
+        v: вектор (массив numpy)"""
     norm = np.sum(np.abs(v))
-    if norm==0:
+    if norm == 0:
         return v
-    return v/norm
+    return v / norm
+
 
 def normalizeL2(v):
-    """ нормирует вектор v по Евклидовой норме L2
+    """нормирует вектор v по Евклидовой норме L2
     сумма квадратов компонентов v (и его длина) будет равна 1
     Args:
-        v: вектор (массив numpy) """
+        v: вектор (массив numpy)"""
     norm = np.linalg.norm(v)
-    if norm==0:
+    if norm == 0:
         return v
-    return v/norm
+    return v / norm
+
 
 def rotAxisAngle(a, b):
-    """ возврат оси и угла поворота от вектора a к b
-    угол в радианах, ось нормирована """
+    """возврат оси и угла поворота от вектора a к b
+    угол в радианах, ось нормирована"""
     angle = vAngle(a, b)
-    if abs(angle)<=1e-3:
-        axis = np.array([1,0,0])
-    elif abs(angle)==np.pi: # редкий случай для a = -b
+    if abs(angle) <= 1e-3:
+        axis = np.array([1, 0, 0])
+    elif abs(angle) == np.pi:  # редкий случай для a = -b
         axis = np.random.rand(3)
-        Warning('rotAxisAngle: abs(angle)==np.pi, возвращаю случайную ось!')
+        Warning("rotAxisAngle: abs(angle)==np.pi, возвращаю случайную ось!")
     else:
         axis = np.cross(a, b)
     return normalizeL2(axis), angle
 
+
 def normalizeMax1(v):
-    """ максимальный компонент v будет = 1
+    """максимальный компонент v будет = 1
     Args:
-        v: вектор (массив numpy) """
+        v: вектор (массив numpy)"""
     m = np.max(v)
-    if m==0:
+    if m == 0:
         return v
-    return v/m
+    return v / m
+
 
 def vIsPerp(A, B, tolerance=1e-9):
-    """ перперндикулярен ли A к B """
+    """перперндикулярен ли A к B"""
     return np.dot(A, B) <= tolerance
 
-#%% Сф. геометрия
+
+# %% Сф. геометрия
 def CartesianToSpherical(v):
-    """ Прямоугольные координаты в сферические
+    """Прямоугольные координаты в сферические
     Args:
-        v (float 3): вектор """
-    r       =  np.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2])
-    theta   =  np.arccos(v[2]/r)
-    phi     =  np.arctan2(v[1],v[0])
+        v (float 3): вектор"""
+    r = np.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
+    theta = np.arccos(v[2] / r)
+    phi = np.arctan2(v[1], v[0])
     return r, theta, phi
 
+
 def SphericalToCartesian(theta, phi, r=1):
-    """ сферические координаты в прямоугольные """
+    """сферические координаты в прямоугольные"""
     x = r * np.sin(theta) * np.cos(phi)
     y = r * np.sin(theta) * np.sin(phi)
     z = r * np.cos(theta)
-    return np.stack((x,y,z))
+    return np.stack((x, y, z))
+
 
 def CartesianToAttackSideslip(v):
-    """ вектор в углы атаки/скольжения
+    """вектор в углы атаки/скольжения
     Args:
         v: вектор
     Returns:
@@ -583,19 +629,22 @@ def CartesianToAttackSideslip(v):
     _, theta, aos = CartesianToSpherical(v)
     # phi — азимутальный угол (угол в плоскости XY), радианы - равен aos
     # theta — полярный угол (угол между положительной осью Z и радиусом).
-    aoa = -(theta - np.pi/2) # в угол атаки
+    aoa = -(theta - np.pi / 2)  # в угол атаки
     return aoa, aos
 
+
 def AttackSideslipToCartesian(aoa, aos):
-    """  углы атаки/скольжения -> вектор
+    """углы атаки/скольжения -> вектор
     Args:
         aoa: угол атаки
         aos: угол скольжения
     Returns:
         v: вектор
     """
-    theta = -aoa + np.pi/2 # в угол атаки
+    theta = -aoa + np.pi / 2  # в угол атаки
     return SphericalToCartesian(theta, aos)
+
+
 # np.rad2deg(cart2as(as2cart(np.deg2rad(-2), np.deg2rad(6.89))))
 
 # def cart2AS(v):
@@ -608,40 +657,42 @@ def AttackSideslipToCartesian(aoa, aos):
 #     alpha = -theta + np.pi/2 # в угол атаки
 #     return alpha, phi
 
+
 def SphericalUniformMesh(samples=1, randomize=True):
-    """ генерирует равномерно распределенные точки на сфере
+    """генерирует равномерно распределенные точки на сфере
     алгоритм с числами Фибоначчи
     https://stackoverflow.com/questions/9600801/evenly-distributing-n-points-on-a-sphere
     """
-    rnd = 1.
+    rnd = 1.0
     if randomize:
         rnd = np.random.rand() * samples
 
     points = []
-    offset = 2./samples
-    increment = np.pi * (3. - np.sqrt(5.));
-
+    offset = 2.0 / samples
+    increment = np.pi * (3.0 - np.sqrt(5.0))
     for i in range(samples):
-        y = ((i * offset) - 1) + (offset / 2);
-        r = np.sqrt(1 - pow(y,2))
+        y = ((i * offset) - 1) + (offset / 2)
+        r = np.sqrt(1 - pow(y, 2))
 
         phi = ((i + rnd) % samples) * increment
 
         x = np.cos(phi) * r
         z = np.sin(phi) * r
 
-        points.append([x,y,z])
+        points.append([x, y, z])
     return points
+
 
 # %% 3D геометрия
 def crossLinePlane(r0, a, n, D=0):
-    """ точка пересечения прямой r=r0+at и плоскости с норм вектором n, членом D
+    """точка пересечения прямой r=r0+at и плоскости с норм вектором n, членом D
     см. Воднев, стр. 58)
     """
-    return r0 - a * (np.dot(n, r0) + D) / np.dot(n,a)
+    return r0 - a * (np.dot(n, r0) + D) / np.dot(n, a)
+
 
 def sphVectorsInsideCircle(Vectors, D=30):
-    """ Выбирает из векторов Vectors такие, которые будут внутри круга с углом D.
+    """Выбирает из векторов Vectors такие, которые будут внутри круга с углом D.
     равномерная сетка на шаре, ограниченная кругом
     TODO: ввести ось axis
     Args:
@@ -649,75 +700,83 @@ def sphVectorsInsideCircle(Vectors, D=30):
         Vectors: список (массив Nx3) векторов
         D: сферический угол обзора
     + возвращает углы атаки/скольжения"""
-    axis = np.array([1,0,0])
+    axis = np.array([1, 0, 0])
     v = [np.cos(np.deg2rad(D)), np.sin(np.deg2rad(D)), 0]  # поворот на D вокруг oZ
-    delta = np.linalg.norm(v - axis) # считаем расстояние
+    delta = np.linalg.norm(v - axis)  # считаем расстояние
     P, aoA, aoS = [], [], []
-    for v in Vectors: # выбираем только точки, которые не слишком далеко от оси вращения
-        if np.linalg.norm(v - axis)<=delta:
+    for (
+        v
+    ) in Vectors:  # выбираем только точки, которые не слишком далеко от оси вращения
+        if np.linalg.norm(v - axis) <= delta:
             P.append(v)
     aoA, aoS = CartesianToAttackSideslip(np.array(P))
     return P, np.rad2deg(aoA), np.rad2deg(aoS)
 
+
 # def planePoint(p, A, B, C, D):
 #     return A*p[0] + B*p[1] + C*p[2] + D
 
-def planeEq(a,b,c):
-    """ расчет уравнения плоскости, проходящей через три точки """
+
+def planeEq(a, b, c):
+    """расчет уравнения плоскости, проходящей через три точки"""
     # Найдем два вектора, лежащих в данной плоскости
     ab = b - a
     ac = c - a
     # Определим нормальный вектор плоскости
-    A,B,C = np.cross(ab, ac)
+    A, B, C = np.cross(ab, ac)
     # уравнение плоскости Ax+By+Cz+D=0, где A,B,C - компоненты n
-    D = -(A*a[0] + B*a[1] + C*a[2])
-    return A,B,C,D
+    D = -(A * a[0] + B * a[1] + C * a[2])
+    return A, B, C, D
+
 
 def planePartDeriv(a, b, c):
-    """ частные производные по плоскости, проходящей через три точки """
-    A,B,C,D = planeEq(a,b,c)
+    """частные производные по плоскости, проходящей через три точки"""
+    A, B, C, D = planeEq(a, b, c)
     # считаем производные z по x,y = -A/C, -B/C
-    return np.array([-A/C, -B/C])
+    return np.array([-A / C, -B / C])
+
 
 def MfromAoAS(aoa, aos, da, ds):
-    """ расчёт вектора момента, требуемого для поворота на da,ds
-    вектор момента нормирован """
+    """расчёт вектора момента, требуемого для поворота на da,ds
+    вектор момента нормирован"""
     V1 = AttackSideslipToCartesian(aoa, aos)
-    V2 = AttackSideslipToCartesian(aoa+da, aos+ds)
+    V2 = AttackSideslipToCartesian(aoa + da, aos + ds)
     M = np.cross(V1, V2)
     return M
 
-def vPrint(name, v):
-    print(f'{name} {v[0]:.3f}, {v[1]:.3f}, {v[2]:.3f}')
 
-#%% 2D геометрия
+def vPrint(name, v):
+    print(f"{name} {v[0]:.3f}, {v[1]:.3f}, {v[2]:.3f}")
+
+
+# %% 2D геометрия
 def rotMatrixIB(x):
-    """ возврат матрицы поворота 2D, Воднев с.50(26)
+    """возврат матрицы поворота 2D, Воднев с.50(26)
     при умножении на вектор дает повернутый вектор в инерциальной системе"""
     return np.array([[np.cos(x), -np.sin(x)], [np.sin(x), np.cos(x)]])
+
 
 # def rotateV2(phi, v):
 #     """ поворачивает вектор на phi """
 
 
-
-#%% Модели
-class PID():
-    def __init__(self, p=1, i=0., d=0.):
-        """ простейший пид регулятор """
+# %% Модели
+class PID:
+    def __init__(self, p=1, i=0.0, d=0.0):
+        """простейший пид регулятор"""
         self.p, self.i, self.d = p, i, d
         self.reset()
 
     def reset(self):
-        self.I = np.zeros(3) # интеграл
+        self.I = np.zeros(3)  # интеграл
         self.Eprev = np.zeros(3)
 
     def out(self, PV, SetPoint, dt):
         self.E = SetPoint - PV
-        self.dEdt = (self.E - self.Eprev)/dt
-        self.I += self.E*dt
+        self.dEdt = (self.E - self.Eprev) / dt
+        self.I += self.E * dt
         self.Eprev = self.E
-        return self.p*self.E + self.i*self.I + self.d*self.dEdt
+        return self.p * self.E + self.i * self.I + self.d * self.dEdt
 
 
 # R = PID(i=0.1, d=-10)
@@ -726,18 +785,19 @@ class PID():
 # for i in range(10):
 #     print(R.out(np.array([0,0,0])+0.1*i, 1, dt))
 
-class EMUs():
+
+class EMUs:
     def __init__(self, T1=0.2, Tcycle=0.25):
-        """ модель ЭМУ. Катушки расположены пАрами, по строительным осям КА
+        """модель ЭМУ. Катушки расположены пАрами, по строительным осям КА
         ЭМУ работает часть (время Т1) цикла СОС (Tcycle)
         """
-        self.kEMU  = 0.25 # коэфф. катушек, u(-1..+1) -> L [А*м2]
-        self.T1    = T1
-        self.Tcycle= Tcycle
+        self.kEMU = 0.25  # коэфф. катушек, u(-1..+1) -> L [А*м2]
+        self.T1 = T1
+        self.Tcycle = Tcycle
         self.On = True
 
     def M_B(self, U, B_B):
-        """ суммарный момент ЭМУ
+        """суммарный момент ЭМУ
         Args:
             U (np.array(3)) - Управление [-1..+1]
         """
@@ -745,34 +805,39 @@ class EMUs():
         return np.cross(self.L_B, B_B)
 
     def isWorks(self, t):
-        """ множитель момента ЭМУ, по сути ШИМ-сигнал.
+        """множитель момента ЭМУ, по сути ШИМ-сигнал.
         ЭМУ работает часть (время Т1) цикла СОС (Tcycle)
         Returns:
             isCoilWorks (float): 1 - до Т1, 0 после.
         """
         return (t % self.Tcycle <= self.T1) and self.On
 
-#%% Некатегоризируемое
-class Container():
+
+# %% Некатегоризируемое
+class Container:
     pass
 
+
 def readTleFile(fileTLE):
-    """ чтение файла с TLE. В финале будет загрузка строк по радио """
-    with open(fileTLE, 'r') as file:
+    """чтение файла с TLE. В финале будет загрузка строк по радио"""
+    with open(fileTLE, "r") as file:
         lines = [line.rstrip() for line in file]
     return lines
 
-def iko(y, dt, Td2 = 250**2, idxIKO = 20):
-    """ Метрика ИКО
+
+def iko(y, dt, Td2=250**2, idxIKO=20):
+    """Метрика ИКО
     Args:
         y (array): вектор переходного процесса
         dt (float): dt
         Td2 (float): желаемая постоянная времени в квадрате
         idxIKO (int): с какого индекса с начала начинаем расчет - до него отбрасываем
     """
-    if len(y.shape)>1:
+    if len(y.shape) > 1:
         ny = np.linalg.norm(y, axis=1)
     else:
         ny = y
-    dny = 1/dt * np.diff(ny)
-    return np.sum(ny[idxIKO:]**2) + 200*np.sum(dny[idxIKO:]**2) # вырежем первоначальный разгон
+    dny = 1 / dt * np.diff(ny)
+    return np.sum(ny[idxIKO:] ** 2) + 200 * np.sum(
+        dny[idxIKO:] ** 2
+    )  # вырежем первоначальный разгон

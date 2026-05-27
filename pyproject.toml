@@ -7,7 +7,7 @@ dependencies = [
     "numpy",
     "scipy",
     "pyquaternion",
-    "pysimscheduler @ git+https://gitflic.ru/project/asserthq/pysimsheduler-fork.git@master"
+    "pysimscheduler @ git+https://gitflic.ru/project/asserthq/pysimsheduler.git@master"
 ]
 
 [tool.pyright]
