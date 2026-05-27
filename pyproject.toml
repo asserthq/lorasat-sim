@@ -6,6 +6,7 @@ requires-python = ">=3.10"
 dependencies = [
     "numpy",
     "scipy",
+    "pyquaternion",
     "pysimscheduler @ git+https://gitflic.ru/project/asserthq/pysimsheduler-fork.git@master"
 ]
 

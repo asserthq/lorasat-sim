@@ -1,8 +1,19 @@
-venv
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
 .venv
-__pycache__
+
+# Editor files
 .cursor
 .vscode
 .zed
 .ipynb_checkpoints
-data
+
+# Output files
+output
