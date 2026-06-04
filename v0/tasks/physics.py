@@ -13,23 +13,26 @@
 Физику поворотов проверил. Кватернионы ковариантные.
 """
 
+from cmath import pi
 from importlib import reload
 
+import db
 import numpy as np
 from pyquaternion import Quaternion
 from pysimscheduler import libADCSMini as libADCS
 from pysimscheduler import libKernel
 from scipy.integrate import odeint
 
-import db
-
 X_I, Y_I, Z_I = libADCS.X, libADCS.Y, libADCS.Z
 NORM_STEP = 15  # шаг нормировки кватерниона
 N_STEPS = 5  # колво шагов по времени, НОД(T1,Tcycle) в class EMUs
 
+OMEGA_INIT = np.array([(pi / 6) / (3**0.5), (pi / 6) / (3**0.5), (-pi / 6) / (3**0.5)])
+# OMEGA_INIT = np.zeros(3)
+
 
 class EMUs:
-    def __init__(self, T1=0.2, Tcycle=0.25):
+    def __init__(self, T1=0.15, Tcycle=0.2):
         """модель ЭМУ. Катушки расположены пАрами, по строительным осям КА (по осям ССК / B)
         ЭМУ работает часть (время Т1) цикла СОС (Tcycle)
         """
@@ -72,6 +75,10 @@ class EMUs:
 # %% Физика
 # Класс с описанием физики движения
 class Physics(libKernel.TaskTemplate):
+    def __init__(self, tasks, db, cycle):
+        self.cycle = cycle
+        super().__init__(TaskList=tasks, DB=db)
+
     # --- Параметры модели ---
     J = np.diag([0.0122] * 3)  # момент инерции кубсата
     # J *= 1 +  0.05 * J * np.random.standard_normal(3) # добавляем 5% неопределённости
@@ -105,19 +112,11 @@ class Physics(libKernel.TaskTemplate):
         return X_B, Z_B, B_B
 
     def Setup(self):
-        self.Coils = EMUs()  #
+        self.Coils = EMUs(self.cycle * 0.8, self.cycle)  #
         self.ODE = lambda x, t: self.ODE_Rotational(x, t)
         self.tSol = np.linspace(0, self.dt, N_STEPS)
-        # --- переменные модели
-        self.B_I = 40e-6 * X_I  # МПЗ, [T]
-        self.nB_I = libADCS.normalizeL2(
-            self.B_I
-        )  # используем то что B_I неподвижен, так то нужно каждую итерацию
-        self.Q_IB = Quaternion()  # кватернион связанной СК отн. инерциальной
-        self.Omega_I = np.zeros(3)  # угловая скорость КА
-        self.Omega_B = np.zeros(3)
 
-    def Initialize(self, Omega_I=np.zeros(3), Q_IB=Quaternion()):
+    def Initialize(self, Omega_I=OMEGA_INIT, Q_IB=Quaternion()):
         self.NS = NORM_STEP
         self.Omega_I = Omega_I
         self.Q_IB = Q_IB
@@ -130,6 +129,7 @@ class Physics(libKernel.TaskTemplate):
     def Run(self):
         self.Coils.U = self.Uemu  # получаем управление с предыдущего цикла
         self.Mm_B = self.Coils.M_B(self.B_B)
+        self.Uemu_I = self.Q_IB.rotate(self.Uemu)
 
         x0 = [
             self.Omega_B[0],
@@ -161,5 +161,5 @@ class Physics(libKernel.TaskTemplate):
 
 # % Главный цикл
 reload(db)
-model = Physics(TaskList=db.Tasks, DB=db.DataBase())
+model = Physics(db.Tasks, db.DataBase(), cycle=0.5)
 model.Manager.Loop()
