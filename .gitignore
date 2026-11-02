@@ -17,3 +17,5 @@ wheels/
 
 # Output files
 output
+# Rust environment
+target/
